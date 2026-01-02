@@ -3,6 +3,7 @@ local RunService = game:GetService("RunService")
 
 local Packages = script.Parent.Parent.Packages
 local Log = require(Packages.Log)
+local ConfigProcessor = require("./ConfigProcessor")
 local Fmt = require(Packages.Fmt)
 local t = require(Packages.t)
 local Promise = require(Packages.Promise)
@@ -74,6 +75,10 @@ function ServeSession.new(options)
 	local instanceMap = InstanceMap.new(onInstanceChanged)
 	local changeBatcher = ChangeBatcher.new(instanceMap, onChangesFlushed)
 	local reconciler = Reconciler.new(instanceMap)
+
+	reconciler:hookPrecommit(function(patch, instanceMap)
+		ConfigProcessor.transformPatch(patch, instanceMap)
+	end)
 
 	local connections = {}
 
