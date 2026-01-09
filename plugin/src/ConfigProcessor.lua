@@ -7,6 +7,7 @@ local ConfigProcessor = {}
 
 -- Module state: cached aliases and config instance ID
 local cachedAliases = nil
+local cachedUseStringAliases = nil
 local cachedConfigId = nil
 
 @native
@@ -148,12 +149,16 @@ local function emitAccess(base, name)
 end
 
 @native
-local function aliasToPath(str, aliases)
+local function aliasToPath(str, aliases, cachedUseStringAliases)
 	-- "@foo/x/../test  /"
 	local body = str:sub(2)
 
 	local first, rest = body:match("^([^/]+)(.*)")
 	local base = aliases[first] or ("game." .. first)
+
+	if cachedUseStringAliases then
+		return `"{base}{rest}"`
+	end
 
 	local result = base
 
@@ -229,7 +234,7 @@ local function findConfigSourceAndId(patch, instanceMap)
 end
 
 -- Helper: Parse config source to extract roblox.aliases
-local function parseConfigAliases(source)
+local function parseConfig(source)
 	if not source or source == "" then
 		Log.warn("ConfigProcessor: Config source is empty")
 		return nil
@@ -254,17 +259,17 @@ local function parseConfigAliases(source)
 		return nil
 	end
 
-	return configTable.roblox.aliases
+	return configTable.roblox
 end
 
 -- Helper: Transform source by replacing @alias patterns
-local function transformSource(source: string, aliases)
+local function transformSource(source: string, aliases, cachedUseStringAliases)
 	if not source or not aliases then
 		return source
 	end
 
 	return transformRequires(source, function(s)
-		return aliasToPath(s, aliases)
+		return aliasToPath(s, aliases, cachedUseStringAliases)
 	end)
 end
 
@@ -279,15 +284,17 @@ function ConfigProcessor.transformPatch(patch, instanceMap)
 
 	-- Update cache if config changed
 	if configSource and configId ~= cachedConfigId then
-		local aliases = parseConfigAliases(configSource)
-		if aliases then
-			cachedAliases = aliases
+		local config = parseConfig(configSource)
+		if config then
+			cachedAliases = config.aliases
+			cachedUseStringAliases = config.use_string_aliases
 			cachedConfigId = configId
 			Log.trace("ConfigProcessor: Updated aliases cache")
 		else
 			Log.warn("ConfigProcessor: Parse failed; using previous aliases")
 		end
 	end
+
 	-- If no aliases, nothing to transform
 	if not cachedAliases then
 		return
@@ -302,7 +309,7 @@ function ConfigProcessor.transformPatch(patch, instanceMap)
 		then
 			if virtualInstance.Properties and virtualInstance.Properties.Source then
 				virtualInstance.Properties.Source.String =
-					transformSource(virtualInstance.Properties.Source.String, cachedAliases)
+					transformSource(virtualInstance.Properties.Source.String, cachedAliases, cachedUseStringAliases)
 			end
 		end
 	end
@@ -313,7 +320,7 @@ function ConfigProcessor.transformPatch(patch, instanceMap)
 			local instance = instanceMap.fromIds[update.id]
 			if instance and (instance:IsA("ModuleScript") or instance:IsA("LocalScript") or instance:IsA("Script")) then
 				update.changedProperties.Source.String =
-					transformSource(update.changedProperties.Source.String, cachedAliases)
+					transformSource(update.changedProperties.Source.String, cachedAliases, cachedUseStringAliases)
 			end
 		end
 	end

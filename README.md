@@ -57,8 +57,9 @@ return {
     },
   },
 
-  -- Aliases to be converted when arrives at roblox
   roblox = {
+    use_string_aliases = false,
+
     aliases = {
       test = "game.ReplicatedStorage.test",
       src = "game.ReplicatedStorage",
@@ -78,7 +79,6 @@ Include the Rojo configuration that references your `.config.luau` file:
     "tree": {
         "$className": "DataModel",
 
-        // this is needed
         "rojo": {
             "$className": "Configuration",
 
@@ -95,6 +95,7 @@ Include the Rojo configuration that references your `.config.luau` file:
 ```
 
 The `roblox.aliases` defined in `.config.luau` will be used when syncing your project.
+`use_string_aliases` is an option to keep as string when syncing
 
 ## [Documentation](https://rojo.space/docs)
 
